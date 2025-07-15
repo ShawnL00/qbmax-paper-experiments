@@ -4,6 +4,7 @@ This project depends on [**pytential**](https://documen.tician.de/pytential/), w
 
 ## Examples Structure
 
+```
 QBMAX Paper Examples
 ├── 2D Problems
 │   ├── Circle Domain
@@ -19,3 +20,4 @@ QBMAX Paper Examples
 │   └── Cruller
 │       ├── Close Evaluation
 │       └── Jump relations
+```
