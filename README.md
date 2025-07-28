@@ -1,4 +1,4 @@
-# Numerical Experiments and Reproducible Code for the QBMAX Paper
+## Numerical Experiments and Reproducible Code for the QBMAX Paper
 
 This project contains all numerical experiments and reproducible code for the QBMAX paper.
 
