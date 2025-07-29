@@ -1,6 +1,6 @@
 ## Numerical Experiments and Reproducible Code for the QBMAX Paper
 
-This project contains all numerical experiments and reproducible code for the QBMAX paper.
+This project contains numerical experiments and reproducible code for the QBMAX paper.
 
 ## Dependencies
 This project depends on [**pytential**](https://documen.tician.de/pytential/). 

@@ -1,8 +1,8 @@
 """
-Comparison of QBMAX vs QBX methods for close evaluation of single-layer potentials
+Comparison of QBMAX vs QBX methods for close evaluation of double-layer potentials
 on the starfish geometry.
 
-This script examines the close evaluation of the single-layer potential S_k σ with
+This script examines the close evaluation of the double-layer potential D_k σ with
 σ(y) = cos(5θ)sin(2θ) where θ := atan2(y_2, y_1) for y = (y_1, y_2) ∈ ℝ².
 The analytical reference solution is obtained by using high-order QBMAX methods
 on a refined mesh.
@@ -61,6 +61,8 @@ def setup_geometry(nelement, expn_order, target_order, upsampling_factor=1):
 
     ambient_dim = 2
     dofdesc = sym.DOFDescriptor("qbx", sym.QBX_SOURCE_QUAD_STAGE2)
+    normals = bind(places, sym.normal(qbx.ambient_dim, dofdesc=dofdesc))(actx).as_vector(object)
+    normals_h = actx.to_numpy(flatten(normals, actx)).reshape(ambient_dim, -1)
 
     target_dofdesc = sym.DOFDescriptor("qbx", sym.QBX_SOURCE_STAGE1)
     normals_target = bind(
@@ -88,16 +90,16 @@ def setup_geometry(nelement, expn_order, target_order, upsampling_factor=1):
     weights_nodes_h = actx.to_numpy(flatten(weights_nodes, actx))
     hmax_h = actx.to_numpy(flatten(hmax, actx))
 
-    return (sources_h, targets_h, centers_in_h, centers_out_h,
-            weights_nodes_h, expansion_radii_h, normals_target_h, hmax_h)
+    return (sources_h, targets_h, centers_in_h, centers_out_h, weights_nodes_h, expansion_radii_h, 
+            normals_h, normals_target_h, hmax_h)
 
 
 def preprocess_arrays(actx, sources, targets, centers_in, centers_out, weights_nodes,
-                     expansion_radii, normal):
+                     expansion_radii, normals, normals_target):
     """Convert numpy arrays to device arrays."""
     return (actx.from_numpy(sources), actx.from_numpy(targets), actx.from_numpy(centers_in),
             actx.from_numpy(centers_out), actx.from_numpy(weights_nodes),
-            actx.from_numpy(expansion_radii), actx.from_numpy(normal))
+            actx.from_numpy(expansion_radii), actx.from_numpy(normals), actx.from_numpy(normals_target))
 
 
 def reference_solution(lam, tau, targets_h, side, expansion_radii_h, normals_target_h):
@@ -111,18 +113,20 @@ def reference_solution(lam, tau, targets_h, side, expansion_radii_h, normals_tar
                                       upsampling_factor_ref)
     sources_h_ref = geometry_data_ref[0]
     weights_nodes_h_ref = geometry_data_ref[4]
-
+    
     angle = np.arctan2(sources_h_ref[1], sources_h_ref[0])
     sigma_ref = np.cos(5 * angle) * np.sin(2 * angle) * weights_nodes_h_ref
     strengths_ref = (actx.from_numpy(sigma_ref),)
 
     centers_ref = actx.from_numpy(targets_h + side / 2 * expansion_radii_h * normals_target_h)
-
-    extra_kwargs = {"lam": lam}
-    from sumpy.kernel import YukawaKernel
+    normals_ref = geometry_data_ref[-3]
+    
+    from sumpy.kernel import YukawaKernel, DirectionalSourceDerivative
 
     knl = YukawaKernel(2)
+    knl = DirectionalSourceDerivative(knl, dir_vec_name="dsource_vec")
     asym_knl = asym_yukawa(2)
+    extra_kwargs = {"lam": lam, 'dsource_vec': normals_ref}
     from sumpy.expansion.local import AsymptoticDividingLineTaylorExpansion
 
     asymexpn_ref = AsymptoticDividingLineTaylorExpansion(knl, asym_knl, expn_order_ref, tau=tau)
@@ -149,7 +153,7 @@ def reference_solution(lam, tau, targets_h, side, expansion_radii_h, normals_tar
 
 def evaluate_expansion(expansion_type, knl, asym_knl, expn_order, tau, lam,
                       targets, sources, expansion_radii, centers_in, centers_out,
-                      weights_nodes_h, sources_h):
+                      weights_nodes_h, sources_h, normals):
     """Evaluate QBMAX and QBX expansion."""
     from sumpy.expansion.local import (
         AsymptoticDividingLineTaylorExpansion,
@@ -157,7 +161,7 @@ def evaluate_expansion(expansion_type, knl, asym_knl, expn_order, tau, lam,
     )
     from sumpy.qbx import LayerPotentialMatrixGenerator
 
-    extra_kwargs = {"lam": lam}
+    extra_kwargs = {"lam": lam, 'dsource_vec': normals}
 
     if expansion_type == "QBMAX":
         expansion = AsymptoticDividingLineTaylorExpansion(knl, asym_knl, expn_order, tau=tau)
@@ -203,18 +207,19 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
     """Run the QBMAX vs QBX comparison."""
     geometry_data = setup_geometry(nelement, expn_order, target_order, upsampling_factor)
     (sources_h, targets_h, centers_in_h, centers_out_h,
-     weights_nodes_h, expansion_radii_h, normals_target_h, hmax_h) = geometry_data
+     weights_nodes_h, expansion_radii_h, normals, normals_target_h, hmax_h) = geometry_data
 
     processed_arrays = preprocess_arrays(
         actx, sources_h, targets_h, centers_in_h, centers_out_h,
-        weights_nodes_h, expansion_radii_h, normals_target_h
+        weights_nodes_h, expansion_radii_h, normals, normals_target_h
     )
     (sources, targets, centers_in, centers_out, weights_nodes,
-     expansion_radii, normal) = processed_arrays
+     expansion_radii, normal, normal_target) = processed_arrays
 
-    from sumpy.kernel import YukawaKernel
+    from sumpy.kernel import YukawaKernel, DirectionalSourceDerivative
 
     knl = YukawaKernel(2)
+    knl = DirectionalSourceDerivative(knl, dir_vec_name="dsource_vec")
     asym_knl = asym_yukawa(2)
 
     qbmax_results = {}
@@ -233,7 +238,7 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
             # QBMAX evaluation
             qbmax_eval = evaluate_expansion("QBMAX", knl, asym_knl, expn_order, tau, lam,
                                            targets, sources, expansion_radii, centers_in, centers_out,
-                                           weights_nodes_h, sources_h)
+                                           weights_nodes_h, sources_h, normals)
 
             err_in = np.max(np.abs(qbmax_eval["inner"] - utrue_vec_in))
             err_out = np.max(np.abs(qbmax_eval["outer"] - utrue_vec_out))
@@ -250,7 +255,7 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
             # QBX evaluation
             qbx_eval = evaluate_expansion("QBX", knl, asym_knl, expn_order, tau, lam,
                                          targets, sources, expansion_radii, centers_in, centers_out,
-                                         weights_nodes_h, sources_h)
+                                         weights_nodes_h, sources_h, normals)
 
             err_in = np.max(np.abs(qbx_eval["inner"] - utrue_vec_in))
             err_out = np.max(np.abs(qbx_eval["outer"] - utrue_vec_out))
@@ -264,6 +269,7 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
                 "abs_err_out": err_out,
             }
 
+    print("Comparison completed")
     return qbmax_results, qbx_results
 
 
@@ -319,7 +325,7 @@ def visualize_results(qbmax_results, qbx_results, lams, taus, nelement, expn_ord
         ax.set_axisbelow(True)
         ax.tick_params()
 
-    plt.suptitle(rf"Close Evaluation of $\mathcal{{S}}_{{k}}\sigma$: $N={nelement}$, "
+    plt.suptitle(rf"Close Evaluation of $\mathcal{{D}}_{{k}}\sigma$: $N={nelement}$, "
                  rf"$p={expn_order}$, $q={target_order + 1}$, $\kappa={upsampling_factor}$",
                  fontsize=14, y=0.95)
 
@@ -340,9 +346,9 @@ actx = PyOpenCLArrayContext(queue)
 
 lams = [10, 20, 40, 80]
 taus = [0, 1 / 8, 1 / 4, 1 / 2, 3 / 4, 7 / 8, 1]
-nelement = 80
-target_order = 6
+nelement = 120
 expn_order = 6
+target_order = 6
 upsampling_factor = 5
 
 print("Starting QBMAX vs QBX comparison...")
