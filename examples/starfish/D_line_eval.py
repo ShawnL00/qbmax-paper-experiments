@@ -273,8 +273,7 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
     return qbmax_results, qbx_results
 
 
-def visualize_results(qbmax_results, qbx_results, lams, taus, nelement, expn_order,
-                     target_order, upsampling_factor):
+def visualize_results():
     """Create comparison plot."""
     import matplotlib.pyplot as plt
     from cycler import cycler
@@ -359,8 +358,7 @@ qbmax_results, qbx_results = run_comparison(
 )
 
 print("Comparison completed. Visualizing results...")
-fig = visualize_results(qbmax_results, qbx_results, lams, taus,
-                       nelement, expn_order, target_order, upsampling_factor)
+fig = visualize_results()
 
 import matplotlib.pyplot as plt
 plt.show()
