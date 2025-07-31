@@ -7,7 +7,7 @@ This project depends on [**pytential**](https://documen.tician.de/pytential/).
 **We strongly recommend** following the official install guide: https://documen.tician.de/pytential/misc.html
 
 ## Examples Structure
-
+Below is the code examples included in the repo. For other numerical test results, code is available upon request.
 ```
 QBMAX Paper Examples
 ├── 2D Problems
