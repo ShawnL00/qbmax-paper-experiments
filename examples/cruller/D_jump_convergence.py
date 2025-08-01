@@ -19,8 +19,8 @@ upsampling_factor = 6
 script_dir = Path(__file__).parent.absolute()
 os.chdir(script_dir)
 
-results_file = "D_jump_convergence.pkl"
-file_exists = os.path.exists(results_file)
+file_name = "D_jump_convergence.pkl"
+file_exists = os.path.exists(file_name)
 
 import matplotlib.pyplot as plt
 
@@ -91,14 +91,14 @@ def visualize_results(data):
 
 
 if file_exists:
-    print("Loading and plotting data...")
-    
-    with open(results_file, "rb") as f:
+    print(f"Loading and plotting data from {file_name}...")
+
+    with open(file_name, "rb") as f:
         data = pickle.load(f)
         visualize_results(data)
 
 else:
-    print("Results file not found. Running computation...")
+    print(f"{file_name} not found. Running computation...")
     import pyopencl as cl
     from meshmode.array_context import PyOpenCLArrayContext
 
@@ -376,7 +376,7 @@ else:
         'targets_normal': eval_targets_normals_h,
     }
 
-    with open(results_file, "wb") as f:
+    with open(file_name, "wb") as f:
         pickle.dump(data, f)
     
     print("\nComputation completed and results saved! Visualizing results...\n")
