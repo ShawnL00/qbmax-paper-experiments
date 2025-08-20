@@ -19,6 +19,7 @@ Parameters tested:
 
 import numpy as np
 
+
 # σ(y) = e^{imθ}
 m = 7
 
@@ -99,12 +100,14 @@ def setup_geometry(nelement, expn_order, target_order, upsampling_factor=1):
 
 
 def preprocess_arrays(
-    actx, sources, targets, centers_in, centers_out, weights_nodes, expansion_radii, normal
+    actx, sources, targets, centers_in, centers_out,
+    weights_nodes, expansion_radii, normal
 ):
     """Convert numpy arrays to device arrays."""
-    return (actx.from_numpy(sources), actx.from_numpy(targets), actx.from_numpy(centers_in),
-            actx.from_numpy(centers_out), actx.from_numpy(weights_nodes), 
-            actx.from_numpy(expansion_radii), actx.from_numpy(normal))
+    return (actx.from_numpy(sources), actx.from_numpy(targets),
+            actx.from_numpy(centers_in), actx.from_numpy(centers_out),
+            actx.from_numpy(weights_nodes), actx.from_numpy(expansion_radii),
+            actx.from_numpy(normal))
 
 
 def analytical_solution(lam, r, tau, targets_h, m, side):
@@ -134,7 +137,7 @@ def analytical_solution(lam, r, tau, targets_h, m, side):
     return result
 
 
-def evaluate_expansion(expansion_type, knl, asym_knl, expn_order, tau, lam, 
+def evaluate_expansion(expansion_type, knl, asym_knl, expn_order, tau, lam,
                       targets, sources, expansion_radii, centers_in, centers_out,
                       weights_nodes_h, sources_h):
     """Evaluate QBMAX and QBX expansion."""
@@ -188,18 +191,19 @@ def evaluate_expansion(expansion_type, knl, asym_knl, expn_order, tau, lam,
     return results
 
 
-def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsampling_factor=4):
+def run_comparison(lams, taus, nelement, target_order, expn_order, upsampling_factor):
     """Run the QBMAX vs QBX comparison."""
-    geometry_data = setup_geometry(nelement, expn_order, target_order, upsampling_factor)
-    (sources_h, targets_h, centers_in_h, centers_out_h, 
-     weights_nodes_h, expansion_radii_h, normals_h, hmax_h) = geometry_data
+    geometry_data = setup_geometry(nelement, expn_order, target_order,
+                                   upsampling_factor)
+    (sources_h, targets_h, centers_in_h, centers_out_h,
+     weights_nodes_h, expansion_radii_h, normals_h, _hmax_h) = geometry_data
 
     processed_arrays = preprocess_arrays(
-        actx, sources_h, targets_h, centers_in_h, centers_out_h, 
+        actx, sources_h, targets_h, centers_in_h, centers_out_h,
         weights_nodes_h, expansion_radii_h, normals_h
     )
-    (sources, targets, centers_in, centers_out, weights_nodes, 
-     expansion_radii, normal) = processed_arrays
+    (sources, targets, centers_in, centers_out, _weights_nodes,
+     expansion_radii, _normal) = processed_arrays
 
     from sumpy.kernel import YukawaKernel
 
@@ -214,13 +218,16 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
         qbx_results[lam] = {}
 
         for tau in taus:
-            utrue_vec_in = analytical_solution(lam, expansion_radii_h, tau, targets_h, m, -1)
-            utrue_vec_out = analytical_solution(lam, expansion_radii_h, tau, targets_h, m, 1)
+            utrue_vec_in = analytical_solution(lam, expansion_radii_h, tau,
+                                                targets_h, m, -1)
+            utrue_vec_out = analytical_solution(lam, expansion_radii_h, tau,
+                                                targets_h, m, 1)
 
             # QBMAX evaluation
-            qbmax_eval = evaluate_expansion("QBMAX", knl, asym_knl, expn_order, tau, lam,
-                                           targets, sources, expansion_radii, centers_in, centers_out,
-                                           weights_nodes_h, sources_h)
+            qbmax_eval = evaluate_expansion("QBMAX", knl, asym_knl, expn_order, tau,
+                                            lam, targets, sources, expansion_radii,
+                                            centers_in, centers_out,
+                                            weights_nodes_h, sources_h)
 
             err_in = np.max(np.abs(qbmax_eval["inner"] - utrue_vec_in))
             err_out = np.max(np.abs(qbmax_eval["outer"] - utrue_vec_out))
@@ -235,9 +242,10 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
             }
 
             # QBX evaluation
-            qbx_eval = evaluate_expansion("QBX", knl, asym_knl, expn_order, tau, lam,
-                                         targets, sources, expansion_radii, centers_in, centers_out,
-                                         weights_nodes_h, sources_h)
+            qbx_eval = evaluate_expansion("QBX", knl, asym_knl, expn_order, tau,
+                                           lam, targets, sources, expansion_radii,
+                                           centers_in, centers_out, weights_nodes_h,
+                                           sources_h)
 
             err_in = np.max(np.abs(qbx_eval["inner"] - utrue_vec_in))
             err_out = np.max(np.abs(qbx_eval["outer"] - utrue_vec_out))
@@ -255,7 +263,7 @@ def run_comparison(lams, taus, nelement=40, target_order=5, expn_order=5, upsamp
     return qbmax_results, qbx_results
 
 
-def visualize_results(qbmax_results, qbx_results, lams, taus, nelement, expn_order, 
+def visualize_results(qbmax_results, qbx_results, lams, taus, nelement, expn_order,
                      target_order, upsampling_factor):
     """Comparison plot."""
     import matplotlib.pyplot as plt
@@ -288,14 +296,14 @@ def visualize_results(qbmax_results, qbx_results, lams, taus, nelement, expn_ord
 
         color = plt.rcParams["axes.prop_cycle"].by_key()["color"][i % 5]
 
-        axs[0].plot(np.log10(plot_taus), np.log10(qbx_in), marker=qbx_marker, linestyle="--", 
-                    color=color, label=f"QBX, $k={lam}$", markersize=6)
-        axs[0].plot(np.log10(plot_taus), np.log10(qbmax_in), marker=qbmax_marker, linestyle="-", 
-                    color=color, label=f"QBMAX, $k={lam}$", markersize=6)
-        axs[1].plot(np.log10(plot_taus), np.log10(qbx_out), marker=qbx_marker, linestyle="--", 
-                    color=color, label=f"QBX, $k={lam}$", markersize=6)
-        axs[1].plot(np.log10(plot_taus), np.log10(qbmax_out), marker=qbmax_marker, linestyle="-", 
-                    color=color, label=f"QBMAX, $k={lam}$", markersize=6)
+        axs[0].plot(np.log10(plot_taus), np.log10(qbx_in), marker=qbx_marker,
+                    linestyle="--", color=color, label=f"QBX, $k={lam}$", markersize=6)
+        axs[0].plot(np.log10(plot_taus), np.log10(qbmax_in), marker=qbmax_marker,
+                    linestyle="-", color=color, label=f"QBMAX, $k={lam}$", markersize=6)
+        axs[1].plot(np.log10(plot_taus), np.log10(qbx_out), marker=qbx_marker,
+                    linestyle="--", color=color, label=f"QBX, $k={lam}$", markersize=6)
+        axs[1].plot(np.log10(plot_taus), np.log10(qbmax_out), marker=qbmax_marker,
+                    linestyle="-", color=color, label=f"QBMAX, $k={lam}$", markersize=6)
 
     axs[0].set_ylabel(r"$\log_{10}(\mathrm{err}^{-}(\tau))$")
     axs[1].set_ylabel(r"$\log_{10}(\mathrm{err}^{+}(\tau))$")
@@ -314,40 +322,43 @@ def visualize_results(qbmax_results, qbx_results, lams, taus, nelement, expn_ord
     )
 
     handles, labels = axs[1].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0), 
+    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0),
                ncol=4, frameon=True, handlelength=2.5)
 
     plt.tight_layout(rect=[0, 0.1, 1, 1])
-    return fig
+    plt.show()
 
 
-import pyopencl as cl
-from meshmode.array_context import PyOpenCLArrayContext
+def main():
+    # Parameters
+    lams = [10, 20, 40, 80]
+    taus = [0, 1 / 8, 1 / 4, 1 / 2, 3 / 4, 7 / 8, 1]
+    nelement = 40
+    target_order = 5
+    expn_order = 5
+    upsampling_factor = 4
 
-cl_ctx = cl.create_some_context()
-queue = cl.CommandQueue(cl_ctx)
-actx = PyOpenCLArrayContext(queue)
+    print("Starting QBMAX vs QBX comparison...")
+    print(f"Parameters: k = {lams}, τ = {taus}")
 
-# Parameters
-lams = [10, 20, 40, 80]
-taus = [0, 1 / 8, 1 / 4, 1 / 2, 3 / 4, 7 / 8, 1]
-nelement = 40
-target_order = 5
-expn_order = 5
-upsampling_factor = 4
+    qbmax_results, qbx_results = run_comparison(
+        lams, taus, nelement, target_order, expn_order, upsampling_factor
+    )
 
-print("Starting QBMAX vs QBX comparison...")
-print(f"Parameters: k = {lams}, τ = {taus}")
+    print("Visualizing results...")
 
-qbmax_results, qbx_results = run_comparison(
-    lams, taus, nelement, target_order, expn_order, upsampling_factor
-)
+    visualize_results(
+        qbmax_results, qbx_results, lams, taus, nelement,
+        expn_order, target_order, upsampling_factor
+    )
 
-print("Comparison completed. Visualizing results...")
 
-import matplotlib.pyplot as plt
+if __name__ == "__main__":
 
-fig = visualize_results(
-    qbmax_results, qbx_results, lams, taus, nelement, expn_order, target_order, upsampling_factor
-)
-plt.show()
+    import pyopencl as cl
+    from meshmode.array_context import PyOpenCLArrayContext
+
+    cl_ctx = cl.create_some_context()
+    queue = cl.CommandQueue(cl_ctx)
+    actx = PyOpenCLArrayContext(queue)
+    main()

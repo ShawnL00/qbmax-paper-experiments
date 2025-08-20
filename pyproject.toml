@@ -28,6 +28,10 @@ extend-ignore = [
     "UP032", # use f-strings instead of .format
     "N816",
     "NPY002",
+    "RUF002", 
+    "RUF003",
+    "N806",
+    "N803"
 ]
 
 [tool.ruff.lint.flake8-quotes]
