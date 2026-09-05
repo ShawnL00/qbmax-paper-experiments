@@ -21,4 +21,12 @@ QBMAX Paper Examples
 ├── 3D Problems
 │   └── Cruller
 │       └── Jump relations of double layer potentials
+└── Cost Analysis
+    └── Weighted operation counts of QBX and QBMAX expansions (SymPy)
 ```
+
+The interior Neumann example runs both QBX and QBMAX, stores the relative error
+of each evaluation, and reproduces the convergence figure of the paper from the
+saved `Neumann.pkl`. The cost-analysis scripts regenerate `flop_count_2d.pkl`
+and `flop_count_3d.pkl` (symbolic differentiation up to order 8, which takes a
+while) and `plot_flop_count.py` draws the figure from them.
